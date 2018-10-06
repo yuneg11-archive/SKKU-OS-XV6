@@ -96,3 +96,37 @@ sys_halt(void)
   outw(0xB004, 0x0|0x2000);
   return 0;
 }
+
+int
+sys_getnice(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return getnice(pid);
+}
+
+int
+sys_setnice(void)
+{
+  int pid;
+  int value;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  if(argint(1, &value) < 0 || argint(1, &value) > 40)
+    return -1;
+  return setnice(pid, value);
+}
+
+int
+sys_ps(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return 0;
+  ps(pid);
+  return 0;
+}

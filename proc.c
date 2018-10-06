@@ -111,6 +111,8 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  p->niceness = 20; // Defualt nice value.
+
   release(&ptable.lock);
 }
 
@@ -168,6 +170,8 @@ fork(void)
   np->cwd = idup(proc->cwd);
 
   safestrcpy(np->name, proc->name, sizeof(proc->name));
+
+  np->niceness = 20; // Default nice value.
 
   pid = np->pid;
 
@@ -482,4 +486,76 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+getnice(int pid)
+{
+  struct proc *p;
+  int niceness;
+
+  // Check valid pid
+  if(pid <= 0)
+    return -1;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      niceness = p->niceness;
+      release(&ptable.lock);
+      return niceness;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+int
+setnice(int pid, int value)
+{
+  struct proc *p;
+
+  // Check valid pid
+  if(pid <= 0)
+    return -1;
+
+  // Check valid nice value
+  if(value < 0 || value > 40)
+    return -1;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      p->niceness = value;
+      release(&ptable.lock);
+      return 0;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+void
+ps(int pid)
+{
+  static char *states[] = {
+  [UNUSED]    "UNUSED", // Dummy
+  [EMBRYO]    "EMBRYO", // Dummy
+  [SLEEPING]  "SLEEPING",
+  [RUNNABLE]  "RUNNABLE",
+  [RUNNING]   "RUNNING",
+  [ZOMBIE]    "ZOMBIE"
+  };
+
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if((p->pid == pid || pid == 0) && p->pid != 0 && (p->state >= 2 && p->state <= 5)){
+      cprintf("%d %d %s %s\n", p->pid, p->niceness, states[p->state], p->name);
+      if(pid)
+        break;
+    }
+  }
+  release(&ptable.lock);
 }

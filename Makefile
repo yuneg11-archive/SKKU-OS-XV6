@@ -176,6 +176,9 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_halt\
+	_getnice\
+	_setnice\
+	_ps
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -239,7 +242,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 # SKKU operating system
 PROJECTNUM=1
 # enter your ID
-STUDENTID=2011311671
+STUDENTID=2017311656
 
 # DO NOT EDIT
 tarball:
