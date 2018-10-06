@@ -98,6 +98,13 @@ sys_halt(void)
 }
 
 int
+sys_yield(void)
+{
+  yield();
+  return 0;
+}
+
+int
 sys_getnice(void)
 {
   int pid;

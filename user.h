@@ -24,6 +24,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int halt(void) __attribute__((noreturn));
+void yield(void);
 int getnice(int pid);
 int setnice(int pid, int value);
 void ps(int pid);

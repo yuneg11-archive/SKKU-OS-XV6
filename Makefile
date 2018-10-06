@@ -90,9 +90,9 @@ xv6.img: bootblock kernel fs.img
 	dd if=kernel of=xv6.img seek=1 conv=notrunc status=none
 
 xv6memfs.img: bootblock kernelmemfs
-	dd if=/dev/zero of=xv6memfs.img count=10000 status=none
-	dd if=bootblock of=xv6memfs.img conv=notrunc status=none
-	dd if=kernelmemfs of=xv6memfs.img seek=1 conv=notrunc status=none
+	dd if=/dev/zero of=xv6memfs.img count=10000
+	dd if=bootblock of=xv6memfs.img conv=notrunc
+	dd if=kernelmemfs of=xv6memfs.img seek=1 conv=notrunc
 
 bootblock: bootasm.S bootmain.c
 	$(CC) $(CFLAGS) -fno-pic -O -nostdinc -I. -c bootmain.c
@@ -240,7 +240,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 
 # SKKU operating system
-PROJECTNUM=1
+PROJECTNUM=2
 # enter your ID
 STUDENTID=2017311656
 
