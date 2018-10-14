@@ -6,11 +6,20 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "pstat.h"
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
 } ptable;
+
+struct procnode {
+  struct proc *process;
+  struct procnode *next;
+} procnode[5*NPROC]; // Temporary array size
+struct procnode *mlfq[NICEUPPBOUND-NICELOWBOUND+1];
+
+int ticklimit[NICEUPPBOUND+1] = { 1, 2, 4, 8, 16, 32 ,64, 128, 256, 512, 1024 };
 
 static struct proc *initproc;
 
@@ -23,7 +32,69 @@ static void wakeup1(void *chan);
 void
 pinit(void)
 {
+  struct procnode *pcur;
+  struct procnode **mlfqcur;
+
   initlock(&ptable.lock, "ptable");
+  for(pcur = procnode; pcur < &procnode[5*NPROC]; pcur++){
+    pcur->process = 0;
+    pcur->next = 0;
+  }
+  for(mlfqcur = mlfq; mlfqcur < &mlfq[NICEUPPBOUND-NICELOWBOUND+1]; mlfqcur++)
+    *mlfqcur = 0;
+}
+
+void
+pushbackmlfq(struct proc *p)
+{
+  struct procnode *pcur;
+  struct procnode *pnode;
+
+  p->ticks = 0;
+
+  for(pnode = procnode; pnode < &procnode[5*NPROC]; pnode++){
+    if(pnode->process == 0) break;
+    if(pnode->process->state == UNUSED) break;
+  }
+  pnode->process = p;
+  pnode->next = 0;
+  if(mlfq[p->nice] == 0)
+    mlfq[p->nice] = pnode;
+  else{
+    for(pcur = mlfq[p->nice]; pcur->next != 0; pcur = pcur->next);
+    pcur->next = pnode;
+  }
+}
+
+void
+pushfrontmlfq(struct proc *p)
+{
+  struct procnode *pnode;
+
+  for(pnode = procnode; pnode < &procnode[5*NPROC]; pnode++){
+    if(pnode->process == 0) break;
+    if(pnode->process->state == UNUSED) break;
+  }
+  pnode->process = p;
+  pnode->next = mlfq[p->nice];
+  mlfq[p->nice] = pnode;
+}
+
+struct proc*
+popmlfq()
+{
+  struct proc *p;
+  int i;
+
+  for(i = NICELOWBOUND; i <= NICEUPPBOUND; i++){
+    if(mlfq[i] != 0){
+      p = mlfq[i]->process;
+      mlfq[i]->process = 0;
+      mlfq[i] = mlfq[i]->next;
+      return p;
+    }
+  }
+  return 0;
 }
 
 //PAGEBREAK: 32
@@ -49,6 +120,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->nice = 0;
+  p->ticks = 0;
+  p->ticksaccum = 0;
 
   release(&ptable.lock);
 
@@ -110,8 +184,8 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
-
-  p->niceness = 20; // Defualt nice value.
+  p->nice = NICELOWBOUND;
+  pushbackmlfq(p);
 
   release(&ptable.lock);
 }
@@ -171,13 +245,13 @@ fork(void)
 
   safestrcpy(np->name, proc->name, sizeof(proc->name));
 
-  np->niceness = 20; // Default nice value.
-
   pid = np->pid;
 
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  np->nice = NICELOWBOUND;
+  pushbackmlfq(np);
 
   release(&ptable.lock);
 
@@ -284,6 +358,7 @@ void
 scheduler(void)
 {
   struct proc *p;
+  int i;
 
   for(;;){
     // Enable interrupts on this processor.
@@ -291,25 +366,28 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
+    for(i = NICELOWBOUND; i <= NICEUPPBOUND; i++){
+      while(mlfq[i] != 0){
+        p = mlfq[i]->process;
+        mlfq[i]->process = 0;
+        mlfq[i] = mlfq[i]->next;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      swtch(&cpu->scheduler, p->context);
-      switchkvm();
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+        swtch(&cpu->scheduler, p->context);
+        switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      proc = 0;
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        proc = 0;
+        i = NICELOWBOUND;
+      }
     }
     release(&ptable.lock);
-
   }
 }
 
@@ -344,6 +422,17 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   proc->state = RUNNABLE;
+  proc->ticks++;
+  proc->ticksaccum++;
+  if(proc->ticks == ticklimit[proc->nice] && proc->nice < NICEUPPBOUND){
+    proc->nice++;
+    ///*DEBUG*/cprintf("  %s(%p) -> nice = %d\n", proc->name, proc, proc->nice);
+    pushbackmlfq(proc);
+  } else if(proc->ticks == 3*ticklimit[NICEUPPBOUND] && proc->nice == NICEUPPBOUND){
+    proc->nice = 0;
+    pushbackmlfq(proc);
+  } else
+    pushfrontmlfq(proc);
   sched();
   release(&ptable.lock);
 }
@@ -414,9 +503,12 @@ wakeup1(void *chan)
 {
   struct proc *p;
 
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      pushbackmlfq(p);
+    }
+  }
 }
 
 // Wake up all processes sleeping on chan.
@@ -441,8 +533,10 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        pushbackmlfq(p);
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -489,10 +583,31 @@ procdump(void)
 }
 
 int
+getpinfo(struct pstat *pst)
+{
+  struct proc *p;
+  int i;
+
+  if(pst == 0)
+    return -1;
+
+  for(p = ptable.proc, i = 0; p < &ptable.proc[NPROC]; p++, i++){
+    if(p->state == UNUSED)
+      pst->inuse[i] = 0;
+    else
+      pst->inuse[i] = 1;
+    pst->nice[i] = p->nice;
+    pst->pid[i] = p->pid;
+    pst->ticks[i] = p->ticksaccum;
+  }
+  return 0;
+}
+
+int
 getnice(int pid)
 {
   struct proc *p;
-  int niceness;
+  int nice;
 
   // Check valid pid
   if(pid <= 0)
@@ -501,9 +616,9 @@ getnice(int pid)
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-      niceness = p->niceness;
+      nice = p->nice;
       release(&ptable.lock);
-      return niceness;
+      return nice;
     }
   }
   release(&ptable.lock);
@@ -520,13 +635,15 @@ setnice(int pid, int value)
     return -1;
 
   // Check valid nice value
-  if(value < 0 || value > 40)
+  if(value < NICELOWBOUND || value > NICEUPPBOUND)
     return -1;
 
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pid == pid){
-      p->niceness = value;
+      p->nice = value;
+      p->state = RUNNABLE;
+      pushbackmlfq(p);
       release(&ptable.lock);
       return 0;
     }
@@ -552,7 +669,7 @@ ps(int pid)
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if((p->pid == pid || pid == 0) && p->pid != 0 && (p->state >= 2 && p->state <= 5)){
-      cprintf("%d %d %s %s\n", p->pid, p->niceness, states[p->state], p->name);
+      cprintf("%d %d %s %s\n", p->pid, p->nice, states[p->state], p->name);
       if(pid)
         break;
     }

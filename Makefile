@@ -178,7 +178,9 @@ UPROGS=\
 	_halt\
 	_getnice\
 	_setnice\
-	_ps
+	_ps\
+        _getpinfo\
+        _mlfqtest
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)

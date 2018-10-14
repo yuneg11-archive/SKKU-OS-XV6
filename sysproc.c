@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "proc.h"
+#include "pstat.h"
 
 int
 sys_fork(void)
@@ -105,6 +106,17 @@ sys_yield(void)
 }
 
 int
+sys_getpinfo(void)
+{
+  struct pstat *pst;
+
+  if(argptr(0, (char**)&pst, sizeof(struct pstat)) < 0)
+    return -1;
+
+  return getpinfo(pst);
+}
+
+int
 sys_getnice(void)
 {
   int pid;
@@ -122,7 +134,7 @@ sys_setnice(void)
 
   if(argint(0, &pid) < 0)
     return -1;
-  if(argint(1, &value) < 0 || argint(1, &value) > 40)
+  if(argint(1, &value) < NICELOWBOUND || argint(1, &value) > NICEUPPBOUND)
     return -1;
   return setnice(pid, value);
 }
