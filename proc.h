@@ -1,6 +1,9 @@
+// Segments in proc->gdt.
+#define NSEGS     7
+
 // Per-CPU state
 struct cpu {
-  uchar apicid;                // Local APIC ID
+  uchar id;                    // Local APIC ID; index into cpus[] below
   struct context *scheduler;   // swtch() here to enter scheduler
   struct taskstate ts;         // Used by x86 to find stack for interrupt
   struct segdesc gdt[NSEGS];   // x86 global descriptor table

@@ -431,8 +431,9 @@ yield(void)
   } else if(proc->ticks == 3*ticklimit[NICEUPPBOUND] && proc->nice == NICEUPPBOUND){
     proc->nice = 0;
     pushbackmlfq(proc);
-  } else
+  } else {
     pushfrontmlfq(proc);
+  }
   sched();
   release(&ptable.lock);
 }
