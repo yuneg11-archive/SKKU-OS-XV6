@@ -77,6 +77,18 @@ trap(struct trapframe *tf)
             cpu->id, tf->cs, tf->eip);
     lapiceoi();
     break;
+
+  case T_PGFLT:
+    if(rcr2() >= (uint)(proc->usb-PGSIZE) && rcr2() < (uint)(proc->usb)){
+      if(allocuvm(proc->pgdir, (uint)(proc->usb-PGSIZE), (uint)(proc->usb-1)) != 0){
+        proc->usb = proc->usb-PGSIZE;
+        lapiceoi();
+        break;
+      }
+    }
+    cprintf("segmentation fault (cr2=0x%x)\n", rcr2());
+    proc->killed = 1;
+    break;
    
   //PAGEBREAK: 13
   default:

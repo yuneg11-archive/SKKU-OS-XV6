@@ -17,7 +17,11 @@
 int
 fetchint(uint addr, int *ip)
 {
-  if(addr >= proc->sz || addr+4 > proc->sz)
+  if(addr >= KERNBASE || addr+4 > KERNBASE)
+    return -1;
+  else if(addr >= proc->sz && addr < (uint)proc->usb)
+    return -1;
+  else if(addr+4 > proc->sz && addr+4 <= (uint)proc->usb)
     return -1;
   *ip = *(int*)(addr);
   return 0;
@@ -31,10 +35,13 @@ fetchstr(uint addr, char **pp)
 {
   char *s, *ep;
 
-  if(addr >= proc->sz)
+  if(addr >= KERNBASE || (addr >= proc->sz && addr < (uint)proc->usb))
     return -1;
   *pp = (char*)addr;
-  ep = (char*)proc->sz;
+  if(addr < proc->sz)
+    ep = (char*)proc->sz;
+  else
+    ep = (char*)KERNBASE;
   for(s = *pp; s < ep; s++)
     if(*s == 0)
       return s - *pp;
@@ -58,7 +65,11 @@ argptr(int n, char **pp, int size)
   
   if(argint(n, &i) < 0)
     return -1;
-  if((uint)i >= proc->sz || (uint)i+size > proc->sz)
+  if((uint)i >= KERNBASE || (uint)i+size > KERNBASE)
+    return -1;
+  else if((uint)i >= proc->sz && (uint)i < (uint)proc->usb)
+    return -1;
+  else if((uint)i+size > proc->sz && (uint)i+size < (uint)proc->usb)
     return -1;
   *pp = (char*)i;
   return 0;

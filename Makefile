@@ -173,11 +173,17 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_halt\
-        _getnice\
-        _setnice\
-        _ps\
-        _getpinfo\
-        _mlfqtest\
+	_getnice\
+	_setnice\
+	_ps\
+	_getpinfo\
+	_mlfqtest\
+	_memtest1\
+	_memtest2\
+	_memtest3\
+	_memtest4\
+	_memtest5\
+	_memtest6\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
