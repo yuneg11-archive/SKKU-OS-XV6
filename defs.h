@@ -68,6 +68,7 @@ char*           kalloc(void);
 void            kfree(char*);
 void            kinit1(void*, void*);
 void            kinit2(void*, void*);
+int freemem(void);
 
 // kbd.c
 void            kbdintr(void);
@@ -119,10 +120,17 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+int             getpid(void);
 int             getpinfo(struct pstat*);
 int             getnice(int);
 int             setnice(int, int);
 void            ps(int);
+
+// thread.c
+int             thread_create(void*(*)(void *), int, void*, void*);
+void            thread_exit(void*);
+int             thread_join(int, void**);
+int             gettid(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

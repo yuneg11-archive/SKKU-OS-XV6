@@ -30,6 +30,11 @@ int getpinfo(struct pstat*);
 int getnice(int pid);
 int setnice(int pid, int value);
 void ps(int pid);
+int thread_create(void *(*)(void *), int, void *, void *);
+void thread_exit(void *) __attribute__((noreturn));
+int thread_join(int, void **);
+int gettid(void);
+int getpid(void);
 
 // ulib.c
 int stat(char*, struct stat*);

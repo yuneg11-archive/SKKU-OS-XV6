@@ -27,6 +27,7 @@ OBJS = \
 	uart.o\
 	vectors.o\
 	vm.o\
+	thread.o\
 
 # Cross-compiling (e.g., on Mac OS X)
 # TOOLPREFIX = i386-jos-elf
@@ -177,6 +178,7 @@ UPROGS=\
 	_setnice\
 	_ps\
 	_getpinfo\
+	_threadtest\
 	#_mlfqtest\
 	#_memtest1\
 	#_memtest2\
@@ -245,7 +247,7 @@ qemu-nox-gdb: fs.img xv6.img .gdbinit
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 
 # SKKU operating system
-PROJECTNUM=3
+PROJECTNUM=4
 # enter your ID
 STUDENTID=2017311656
 

@@ -678,3 +678,7 @@ ps(int pid)
   }
   release(&ptable.lock);
 }
+
+int getpid(void){
+  return proc->pid;
+}
